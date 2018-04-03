@@ -1,0 +1,96 @@
+#!/bin/sh
+
+usage() { 
+	echo "timesrc version 2.0 - Copyright (C) 2018 Intelight Inc."
+	echo ""
+	echo "usage:   timesrc - print current time source"
+	echo "         timesrc <name> - set current time source [LINESYNC/RTC_SQUARE_WAVE/CRYSTAL]"
+	echo "         timesrc EXTERNAL1 <port> - set GPS time source for serial port"
+	echo "         timesrc EXTERNAL2 <hostname> - set NTP time source"
+}
+
+currentSource() { 
+	if grep -q LSYN /var/etc/chrony.conf; then
+		echo "Current timesrc is LINESYNC(0)"
+	elif grep -q GPS /var/etc/chrony.conf; then
+		echo "Current timesrc is EXTERNAL1(3)"
+	elif grep -q server /var/etc/chrony.conf; then
+		echo "Current timesrc is EXTERNAL2(4)"
+	else
+		echo "Current timesrc is CRYSTAL(2)"
+	fi
+}
+
+removeExistingSources() {
+	sed -i '|LSYN|d;|GPS|d;|server|d' /etc/chrony/chrony.conf
+}
+
+setSource() {
+	currentSource
+
+	uci set chrony.@refclock[0].driver=NONE
+	uci delete chrony.@server[0]
+	uci commit chrony
+	uci set gpsd.core.enabled=0
+	uci commit gpsd
+
+	case "$1" in
+		LINESYNC)
+			echo "setting timesrc to LINESYNC(0)"
+			uci set chrony.@refclock[0].driver='PPS'
+			uci set chrony.@refclock[0].ppsdev='/dev/pps0'
+			uci set chrony.@refclock[0].maxdispersion='0.01'
+			uci set chrony.@refclock[0].refid='LSYN'
+			uci commit chrony
+			;;
+		CRYSTAL)
+			echo "setting timesrc to CRYSTAL(2)"
+			;;
+		EXTERNAL1 | GPS)
+			echo "setting timesrc to EXTERNAL1(3)"
+			uci set chrony.@refclock[0].driver='SOCK'
+			uci set chrony.@refclock[0].sockpath='/var/run/chrony.ttyS0.sock'
+			uci set chrony.@refclock[0].refid='GPSD'
+			uci commit chrony
+			uci set gpsd.core.device='/dev/ttyS0'
+			uci set gpsd.core.enabled=1
+			uci commit gpsd
+			;;
+		EXTERNAL2 | NTP)
+			echo "setting timesrc to EXTERNAL2(4)"
+			uci add chrony server
+			uci set chrony.@server[0].hostname="$2"
+			uci set chrony.@server[0].iburst='yes'
+			uci commit chrony
+			;;
+	esac
+
+	/etc/init.d/gpsd stop
+	/etc/init.d/chronyd stop
+	/etc/init.d/chronyd start
+	/etc/init.d/gpsd start
+}
+
+if [ "$#" = "0" ]; then
+	currentSource
+	exit 0
+fi
+
+case "$1" in
+	LINESYNC|CRYSTAL|EXTERNAL1|GPS|EXTERNAL2|NTP)
+		setSource $1 $2
+		;;
+	RTC_SQUARE_WAVE)
+		echo "RTC_SQUARE_WAVE is unsupported"
+		exit 1
+		;;
+	--help)
+		usage
+		;;
+	*)
+		echo "Unrecognized timesrc $@"
+		usage
+		exit 1
+		;;
+esac
+

@@ -65,7 +65,6 @@ define Package/libtod/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tod/src/libtod*so* $(1)/usr/lib/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tod/timesrc/timesrc $(1)/usr/bin/
 endef
 
 define Package/libfio/install
