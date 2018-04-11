@@ -5,17 +5,17 @@ usage() {
 	echo ""
 	echo "usage:   timesrc - print current time source"
 	echo "         timesrc <name> - set current time source [LINESYNC/RTC_SQUARE_WAVE/CRYSTAL]"
-	echo "         timesrc EXTERNAL1 <port> - set GPS time source for serial port"
-	echo "         timesrc EXTERNAL2 <hostname> - set NTP time source"
+	echo "         timesrc GPS <port> - set GPS time source for serial port"
+	echo "         timesrc NTP <hostname> - set NTP time source"
 }
 
 currentSource() { 
 	if grep -q LSYN /var/etc/chrony.conf; then
 		echo "Current timesrc is LINESYNC(0)"
 	elif grep -q GPS /var/etc/chrony.conf; then
-		echo "Current timesrc is EXTERNAL1(3)"
+		echo "Current timesrc is GPS(3)"
 	elif grep -q server /var/etc/chrony.conf; then
-		echo "Current timesrc is EXTERNAL2(4)"
+		echo "Current timesrc is NTP(4)"
 	else
 		echo "Current timesrc is CRYSTAL(2)"
 	fi
@@ -47,7 +47,7 @@ setSource() {
 			echo "setting timesrc to CRYSTAL(2)"
 			;;
 		EXTERNAL1 | GPS)
-			echo "setting timesrc to EXTERNAL1(3)"
+			echo "setting timesrc to GPS(3)"
 			uci set chrony.@refclock[0].driver='SOCK'
 			uci set chrony.@refclock[0].sockpath='/var/run/chrony.ttyS0.sock'
 			uci set chrony.@refclock[0].refid='GPSD'
@@ -57,7 +57,7 @@ setSource() {
 			uci commit gpsd
 			;;
 		EXTERNAL2 | NTP)
-			echo "setting timesrc to EXTERNAL2(4)"
+			echo "setting timesrc to NTP(4)"
 			uci add chrony server
 			uci set chrony.@server[0].hostname="$2"
 			uci set chrony.@server[0].iburst='yes'
@@ -77,7 +77,7 @@ if [ "$#" = "0" ]; then
 fi
 
 case "$1" in
-	LINESYNC|CRYSTAL|EXTERNAL1|GPS|EXTERNAL2|NTP)
+	LINESYNC|CRYSTAL|GPS|NTP)
 		setSource $1 $2
 		;;
 	RTC_SQUARE_WAVE)
